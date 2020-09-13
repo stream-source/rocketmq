@@ -29,21 +29,25 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+/**
+ * 映射文件队列：对存储目录的封装，例如CommitLog文件的存储路径${ROCKETMQ_HOME}/store/commitLog
+ */
 public class MappedFileQueue {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     private static final InternalLogger LOG_ERROR = InternalLoggerFactory.getLogger(LoggerName.STORE_ERROR_LOGGER_NAME);
 
     private static final int DELETE_FILES_BATCH_MAX = 10;
-
+    //存储目录
     private final String storePath;
-
+    //单个文件的存储大小
     private final int mappedFileSize;
-
+    //mapperFile集合
     private final CopyOnWriteArrayList<MappedFile> mappedFiles = new CopyOnWriteArrayList<MappedFile>();
 
     private final AllocateMappedFileService allocateMappedFileService;
-
+    //当前刷盘指针，表示该指针之前的所有数据已经全部持久化到磁盘中
     private long flushedWhere = 0;
+    //当前数据提交指针，内存中byteBuffer当前的写指针，该值大于等于flushedWhere
     private long committedWhere = 0;
 
     private volatile long storeTimestamp = 0;
@@ -74,15 +78,22 @@ public class MappedFileQueue {
         }
     }
 
+    /**
+     * 获取指定时间戳的mapperFile
+     * @param timestamp
+     * @return
+     */
     public MappedFile getMappedFileByTime(final long timestamp) {
         Object[] mfs = this.copyMappedFiles(0);
 
         if (null == mfs)
             return null;
-
+        //从第一个MapperFile文件开始遍历
         for (int i = 0; i < mfs.length; i++) {
             MappedFile mappedFile = (MappedFile) mfs[i];
+            //判断文件最后的更新时间是否大于指定查找时间戳
             if (mappedFile.getLastModifiedTimestamp() >= timestamp) {
+                //注意：此处是获取第一个大于指定时间戳的文件，并不是获取所有文件
                 return mappedFile;
             }
         }
@@ -472,6 +483,7 @@ public class MappedFileQueue {
                         this.mappedFileSize,
                         this.mappedFiles.size());
                 } else {
+                    //使用offset定位mapperFile文件算法
                     int index = (int) ((offset / this.mappedFileSize) - (firstMappedFile.getFileFromOffset() / this.mappedFileSize));
                     MappedFile targetFile = null;
                     try {
