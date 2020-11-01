@@ -177,33 +177,42 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
     public void start(final boolean startFactory) throws MQClientException {
         switch (this.serviceState) {
+            //刚开始时，服务处于创建中
             case CREATE_JUST:
+                //故创建时，将服务设置为启动失败状态
                 this.serviceState = ServiceState.START_FAILED;
-
+                //检测配置
                 this.checkConfig();
-
+                //判断group是否为CLIENT_INNER_PRODUCER_GROUP
                 if (!this.defaultMQProducer.getProducerGroup().equals(MixAll.CLIENT_INNER_PRODUCER_GROUP)) {
+                    //不是，则设置PID
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
 
+                //创建MQClientInstance对象
                 this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQProducer, rpcHook);
 
+                //注册producer
                 boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
                 if (!registerOK) {
+                    //若注册失败，则将服务状态标记为CREATE_JUST（仅创建），未启动；
                     this.serviceState = ServiceState.CREATE_JUST;
                     throw new MQClientException("The producer group[" + this.defaultMQProducer.getProducerGroup()
                         + "] has been created before, specify another name please." + FAQUrl.suggestTodo(FAQUrl.GROUP_NAME_DUPLICATE_URL),
                         null);
                 }
 
+                //缓存中保存topic信息
                 this.topicPublishInfoTable.put(this.defaultMQProducer.getCreateTopicKey(), new TopicPublishInfo());
 
+                //启动MQClientInstance
                 if (startFactory) {
                     mQClientFactory.start();
                 }
 
                 log.info("the producer [{}] start OK. sendMessageWithVIPChannel={}", this.defaultMQProducer.getProducerGroup(),
                     this.defaultMQProducer.isSendMessageWithVIPChannel());
+                //启动成功，则将服务标记为running
                 this.serviceState = ServiceState.RUNNING;
                 break;
             case RUNNING:

@@ -144,7 +144,7 @@ public class MQClientInstance {
         this.pullMessageService = new PullMessageService(this);
 
         this.rebalanceService = new RebalanceService(this);
-
+        //客户端内部生产者
         this.defaultMQProducer = new DefaultMQProducer(MixAll.CLIENT_INNER_PRODUCER_GROUP);
         this.defaultMQProducer.resetClientConfig(clientConfig);
 
@@ -227,6 +227,7 @@ public class MQClientInstance {
     public void start() throws MQClientException {
 
         synchronized (this) {
+            //启动MqClientInstance对象，主要解决服务创建状态时
             switch (this.serviceState) {
                 case CREATE_JUST:
                     this.serviceState = ServiceState.START_FAILED;
@@ -235,7 +236,7 @@ public class MQClientInstance {
                         this.mQClientAPIImpl.fetchNameServerAddr();
                     }
                     // Start request-response channel
-                    this.mQClientAPIImpl.start();
+                    this.mQClientAPIImpl.start();//启动Netty客户端
                     // Start various schedule tasks
                     this.startScheduledTask();
                     // Start pull service
@@ -256,6 +257,7 @@ public class MQClientInstance {
     }
 
     private void startScheduledTask() {
+        //1.获取NameSrv地址，默认120秒执行一次
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
@@ -270,6 +272,7 @@ public class MQClientInstance {
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
 
+        //2.从NameSrv上获取Topic信息，默认30秒执行一次
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -282,12 +285,15 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
+        //3.清除下线的broke，并发送心跳到所有存活的broker上，默认30秒执行一次
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
             public void run() {
                 try {
+                    //清除下线broker
                     MQClientInstance.this.cleanOfflineBroker();
+                    //向所有broker上发送心跳
                     MQClientInstance.this.sendHeartbeatToAllBrokerWithLock();
                 } catch (Exception e) {
                     log.error("ScheduledTask sendHeartbeatToAllBroker exception", e);
@@ -357,6 +363,7 @@ public class MQClientInstance {
             }
         }
 
+        //分别获取consumer，producer中的所有Topic
         for (String topic : topicList) {
             this.updateTopicRouteInfoFromNameServer(topic);
         }
@@ -611,8 +618,9 @@ public class MQClientInstance {
             if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 try {
                     TopicRouteData topicRouteData;
-                    //是否使用默认主题获取路由信息：默认topic=defaultMQProducer.getCreateTopicKey()="TBW102"
+                    //是否为默认，且defaultMQProducer!=null
                     if (isDefault && defaultMQProducer != null) {
+                        //是否使用默认主题获取路由信息：默认topic=defaultMQProducer.getCreateTopicKey()="TBW102"
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
                             1000 * 3);
                         if (topicRouteData != null) {
@@ -941,9 +949,11 @@ public class MQClientInstance {
             return false;
         }
 
+        //判断生产者是否已经存在（从producerTable生产者缓存中获取）
         MQProducerInner prev = this.producerTable.putIfAbsent(group, producer);
         if (prev != null) {
             log.warn("the producer group[{}] exist already.", group);
+            //已存在，则注册失败
             return false;
         }
 

@@ -101,15 +101,19 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
 
     public NettyRemotingClient(final NettyClientConfig nettyClientConfig,
         final ChannelEventListener channelEventListener) {
+        //设置异步 与 单向 请求的信号量
         super(nettyClientConfig.getClientOnewaySemaphoreValue(), nettyClientConfig.getClientAsyncSemaphoreValue());
         this.nettyClientConfig = nettyClientConfig;
+        //事件监听
         this.channelEventListener = channelEventListener;
 
+        //获取netty客户端回调线程数，默认时CPU核心线程数
         int publicThreadNums = nettyClientConfig.getClientCallbackExecutorThreads();
         if (publicThreadNums <= 0) {
             publicThreadNums = 4;
         }
 
+        //创建线程池
         this.publicExecutor = Executors.newFixedThreadPool(publicThreadNums, new ThreadFactory() {
             private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -127,7 +131,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 return new Thread(r, String.format("NettyClientSelector_%d", this.threadIndex.incrementAndGet()));
             }
         });
-
+        //是否使用TLS
         if (nettyClientConfig.isUseTLS()) {
             try {
                 sslContext = TlsHelper.buildSslContext(true);
@@ -150,6 +154,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
     @Override
     public void start() {
         this.defaultEventExecutorGroup = new DefaultEventExecutorGroup(
+                //默认4个核心线程
             nettyClientConfig.getClientWorkerThreads(),
             new ThreadFactory() {
 
@@ -162,8 +167,9 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
             });
 
         Bootstrap handler = this.bootstrap.group(this.eventLoopGroupWorker).channel(NioSocketChannel.class)
-            .option(ChannelOption.TCP_NODELAY, true)
+            .option(ChannelOption.TCP_NODELAY, true)//不使用TCP，DELY算法
             .option(ChannelOption.SO_KEEPALIVE, false)
+                //设置连接超时默认3s,发送buffer，接收buffer，默认均为65535
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, nettyClientConfig.getConnectTimeoutMillis())
             .option(ChannelOption.SO_SNDBUF, nettyClientConfig.getClientSocketSndBufSize())
             .option(ChannelOption.SO_RCVBUF, nettyClientConfig.getClientSocketRcvBufSize())

@@ -45,12 +45,16 @@ public class MQClientManager {
     }
 
     public MQClientInstance getOrCreateMQClientInstance(final ClientConfig clientConfig, RPCHook rpcHook) {
+        //获取客户端ID
         String clientId = clientConfig.buildMQClientId();
+        //依据ID，从缓存中获取MQClientInstance对象
         MQClientInstance instance = this.factoryTable.get(clientId);
         if (null == instance) {
+            //如果缓存中不存在，则创建MQClientInstance对象，并存入缓存中
             instance =
                 new MQClientInstance(clientConfig.cloneClientConfig(),
                     this.factoryIndexGenerator.getAndIncrement(), clientId, rpcHook);
+            //存入缓存中，如果存在时，则返回上次创建的对象（个人考虑并发）
             MQClientInstance prev = this.factoryTable.putIfAbsent(clientId, instance);
             if (prev != null) {
                 instance = prev;

@@ -1355,15 +1355,17 @@ public class MQClientAPIImpl {
 
     public TopicRouteData getTopicRouteInfoFromNameServer(final String topic, final long timeoutMillis,
         boolean allowTopicNotExist) throws MQClientException, InterruptedException, RemotingTimeoutException, RemotingSendRequestException, RemotingConnectException {
+        //创建路由请求头
         GetRouteInfoRequestHeader requestHeader = new GetRouteInfoRequestHeader();
         requestHeader.setTopic(topic);
-
+        //创建请求实体：nameSrv依据请求类型GET_ROUTEINFO_BY_TOPIC
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.GET_ROUTEINFO_BY_TOPIC, requestHeader);
-
+        //同步调用获取结果
         RemotingCommand response = this.remotingClient.invokeSync(null, request, timeoutMillis);
         assert response != null;
         switch (response.getCode()) {
             case ResponseCode.TOPIC_NOT_EXIST: {
+                //topic不存在
                 if (allowTopicNotExist) {
                     log.warn("get Topic [{}] RouteInfoFromNameServer is not exist value", topic);
                 }
@@ -1371,6 +1373,7 @@ public class MQClientAPIImpl {
                 break;
             }
             case ResponseCode.SUCCESS: {
+                //获取响应结果
                 byte[] body = response.getBody();
                 if (body != null) {
                     return TopicRouteData.decode(body, TopicRouteData.class);
