@@ -446,11 +446,13 @@ public class MQClientAPIImpl {
         final DefaultMQProducerImpl producer
     ) throws RemotingException, MQBrokerException, InterruptedException {
         long beginStartTime = System.currentTimeMillis();
+        //消息请求类型转换：SendMessageRequestHeader---》RemotingCommand
         RemotingCommand request = null;
         String msgType = msg.getProperty(MessageConst.PROPERTY_MESSAGE_TYPE);
         boolean isReply = msgType != null && msgType.equals(MixAll.REPLY_MESSAGE_FLAG);
         if (isReply) {
             if (sendSmartMsg) {
+                //请求类型requestHeader--》requestHeaderV2
                 SendMessageRequestHeaderV2 requestHeaderV2 = SendMessageRequestHeaderV2.createSendMessageRequestHeaderV2(requestHeader);
                 request = RemotingCommand.createRequestCommand(RequestCode.SEND_REPLY_MESSAGE_V2, requestHeaderV2);
             } else {
@@ -484,6 +486,7 @@ public class MQClientAPIImpl {
                 if (timeoutMillis < costTimeSync) {
                     throw new RemotingTooMuchRequestException("sendMessage call timeout");
                 }
+                //处理同步发送
                 return this.sendMessageSync(addr, brokerName, msg, timeoutMillis - costTimeSync, request);
             default:
                 assert false;
@@ -500,8 +503,10 @@ public class MQClientAPIImpl {
         final long timeoutMillis,
         final RemotingCommand request
     ) throws RemotingException, MQBrokerException, InterruptedException {
+        //同步调用：netty实现
         RemotingCommand response = this.remotingClient.invokeSync(addr, request, timeoutMillis);
         assert response != null;
+        //处理响应
         return this.processSendResponse(brokerName, msg, response);
     }
 

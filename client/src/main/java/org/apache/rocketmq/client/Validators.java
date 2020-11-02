@@ -95,7 +95,7 @@ public class Validators {
         if (0 == msg.getBody().length) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, "the message body length is zero");
         }
-
+        //验证最大消息长度，默认最大4M
         if (msg.getBody().length > defaultMQProducer.getMaxMessageSize()) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL,
                 "the message body size over max value, MAX: " + defaultMQProducer.getMaxMessageSize());
